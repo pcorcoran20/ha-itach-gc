@@ -494,7 +494,7 @@ class ItachGcPanel extends HTMLElement {
   _importDialog() {
     const m = this._openModal(`<h3>Import codes</h3>
       <p class="hint" style="margin:0 0 14px">Pick a <b>Flipper Zero .ir file</b>, an export from this panel, or paste JSON like <code>{"TV": {"Power": "sendir,…"}}</code>.</p>
-      <label class="f">Pick a file<input type="file" id="ifile" accept=".json,.ir,application/json,text/plain"></label>
+      <label class="f">Pick a file<input type="file" id="ifile"></label>
       <label class="f">…or paste it here<textarea id="itext" spellcheck="false" placeholder="JSON, or the contents of a Flipper .ir file"></textarea></label>
       <div id="iflip" hidden>
         <label class="f">Device name for these Flipper signals<input id="idev" maxlength="64" placeholder="e.g. Fireplace"></label>
@@ -513,7 +513,10 @@ class ItachGcPanel extends HTMLElement {
     $("#ifile").onchange = async (e) => {
       const f = e.target.files?.[0];
       if (!f) return;
-      $("#itext").value = await f.text();
+      if (f.size > 5 * 1024 * 1024) { this._toast("That file is too big to be a .ir or JSON file 😅", true); return; }
+      const text = await f.text();
+      if (text.includes("\u0000")) { this._toast("That doesn't look like a text file – pick a Flipper .ir or a .json export 🙏", true); return; }
+      $("#itext").value = text;
       if (!$("#idev").value) $("#idev").value = f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
       refresh();
     };

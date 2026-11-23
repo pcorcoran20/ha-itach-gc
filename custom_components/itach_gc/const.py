@@ -1,7 +1,7 @@
 """Constants for the Global Caché iTach integration."""
 
 DOMAIN = "itach_gc"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 MANUFACTURER = "Global Caché"
 
 STORAGE_VERSION = 1
