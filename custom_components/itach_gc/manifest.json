@@ -1,0 +1,13 @@
+{
+  "domain": "itach_gc",
+  "name": "Global Caché iTach IR",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/YOUR_GITHUB_USER/ha-itach-gc",
+  "integration_type": "hub",
+  "iot_class": "assumed_state",
+  "issue_tracker": "https://github.com/YOUR_GITHUB_USER/ha-itach-gc/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

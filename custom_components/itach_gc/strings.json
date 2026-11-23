@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a Global Caché iTach",
+        "description": "Enter the IP address of your iTach (IP2IR, WF2IR, Flex…). Tip: give it a fixed IP in your router.",
+        "data": {
+          "host": "IP address or hostname",
+          "name": "Name (optional)",
+          "port": "Port"
+        }
+      },
+      "reconfigure": {
+        "title": "Update iTach connection",
+        "data": {
+          "host": "IP address or hostname",
+          "port": "Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Couldn't talk to the iTach. Check the IP and that it's powered on.",
+      "unknown": "Something unexpected went wrong – check the logs."
+    },
+    "abort": {
+      "already_configured": "This iTach is already added.",
+      "reconfigure_successful": "Connection updated."
+    }
+  }
+}
