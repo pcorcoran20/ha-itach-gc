@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN, STORAGE_VERSION
+from .flipper import split_ir_file
 from .itach import parse_code
 
 
@@ -167,6 +168,28 @@ class CodeStore:
                 for dev in self.devices.values()
             ],
         }
+
+    async def async_import_flipper(
+        self, text: str, device_name: str, default_connector: str
+    ) -> dict[str, Any]:
+        """Import every signal in a Flipper Zero .ir file into one device."""
+        commands, skipped, seen = [], [], {}
+        for name, block in split_ir_file(text):
+            try:
+                parse_code(block)
+            except ValueError as err:
+                skipped.append(f"{name}: {err}")
+                continue
+            base = (name.strip() or "Button")[:60]
+            seen[base.casefold()] = seen.get(base.casefold(), 0) + 1
+            n = seen[base.casefold()]
+            commands.append({"name": base if n == 1 else f"{base} {n}", "code": block})
+        if not commands:
+            raise ValueError("Nothing could be imported:\n" + "\n".join(skipped[:10]))
+        res = await self.async_import(
+            {"devices": [{"name": device_name, "commands": commands}]}, default_connector
+        )
+        return {**res, "skipped": skipped}
 
     async def async_import(
         self, data: Any, default_connector: str, replace: bool = False

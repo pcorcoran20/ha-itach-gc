@@ -90,3 +90,20 @@ async def test_panel_ws_and_entities(hass, hass_ws_client, fake_itach):
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert "itach-gc" not in hass.data["frontend_panels"]
+
+
+async def test_import_flipper(hass, hass_ws_client, fake_itach):
+    from .test_flipper import USER_FILE
+
+    entry = MockConfigEntry(domain=DOMAIN, title="iTach", data={CONF_HOST: "127.0.0.1", CONF_PORT: fake_itach.port})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "itach_gc/import_flipper", "entry_id": entry.entry_id, "text": USER_FILE, "device": "Fireplace"})
+    r = await ws.receive_json()
+    assert r["result"]["commands"] == 4
+    assert len(r["result"]["skipped"]) == 1 and "Kaseikyo" in r["result"]["skipped"][0]
+    await hass.async_block_till_done()
+    await hass.services.async_call("button", "press", {"entity_id": "button.fireplace_on_toggle"}, blocking=True)
+    assert fake_itach.received[-1].startswith("sendir,1:1,1,38000,1,1,342,171,")

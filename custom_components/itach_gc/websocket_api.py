@@ -162,6 +162,7 @@ async def ws_parse(hass, connection, msg):
         "repeat": ir.repeat,
         "offset": ir.offset,
         "connector": ir.connector,
+        "detail": ir.detail,
         "pulse_count": len(ir.pulses),
         "pulses": ir.numeric_pulses(),
         "sendir": ir.to_sendir(ir.connector or "1:1", 1),
@@ -186,6 +187,21 @@ async def ws_import(hass, connection, msg):
     return await data.store.async_import(msg["data"], data.info.connectors[0], msg["replace"])
 
 
+@_cmd(
+    {
+        vol.Required("type"): f"{DOMAIN}/import_flipper",
+        **ENTRY,
+        vol.Required("text"): str,
+        vol.Required("device"): str,
+    }
+)
+async def ws_import_flipper(hass, connection, msg):
+    data = _data(hass, msg["entry_id"])
+    return await data.store.async_import_flipper(
+        msg["text"], msg["device"], data.info.connectors[0]
+    )
+
+
 @callback
 def async_register(hass: HomeAssistant) -> None:
     for handler in (
@@ -200,5 +216,6 @@ def async_register(hass: HomeAssistant) -> None:
         ws_parse,
         ws_export,
         ws_import,
+        ws_import_flipper,
     ):
         websocket_api.async_register_command(hass, handler)

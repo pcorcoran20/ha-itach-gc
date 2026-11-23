@@ -11,6 +11,7 @@ const FORMAT_LABEL = {
   raw: "Global Caché (no header)",
   compressed: "Global Caché (compressed)",
   pronto: "Pronto hex",
+  flipper: "Flipper Zero",
 };
 
 const STYLE = `
@@ -358,7 +359,7 @@ class ItachGcPanel extends HTMLElement {
         <label class="f">Repeat (blank = use code's own)<input id="crep" type="number" min="1" max="50" placeholder="auto" value="${esc(c?.repeat ?? "")}"></label>
         <div></div>
       </div>
-      <p class="hint">Paste a Global Caché <b>sendir</b> code, bare GC data, or a <b>Pronto hex</b> code (e.g. from the Global Caché Control Tower database or irdb). Or hit <b>Learn</b> and point your remote at the iTach.</p>
+      <p class="hint">Paste a Global Caché <b>sendir</b> code, bare GC data, or a <b>Pronto hex</b> code (e.g. from the Global Caché Control Tower database or irdb), or one <b>Flipper Zero</b> signal (the <code>type/protocol/address/command</code> lines from a .ir file). Or hit <b>Learn</b> and point your remote at the iTach.</p>
       <div class="actions">
         <button class="btn" id="clearn">📡 Learn</button>
         <button class="btn" id="ctest">▶ Test</button>
@@ -380,7 +381,7 @@ class ItachGcPanel extends HTMLElement {
         parsed = await this.ws("parse", { code });
         if (codeEl.value.trim() !== code) return; // stale
         const dur = parsed.pulses ? parsed.pulses.reduce((s, p) => s + p, 0) / parsed.freq * 1000 : null;
-        info.innerHTML = `<span class="badge ok">✓ ${esc(FORMAT_LABEL[parsed.format] || parsed.format)}</span>
+        info.innerHTML = `<span class="badge ok">✓ ${esc(FORMAT_LABEL[parsed.format] || parsed.format)}${parsed.detail ? ` · ${esc(parsed.detail)}` : ""}</span>
           <span class="m">${(parsed.freq / 1000).toFixed(1)} kHz · ${parsed.pulse_count / (parsed.pulses ? 2 : 1)} ${parsed.pulses ? "pulse pairs" : "tokens"}${dur ? ` · ${dur.toFixed(0)} ms` : ""} · repeat ${parsed.repeat}</span>`;
         wave.innerHTML = parsed.pulses ? this._wave(parsed) : this._waveEmpty("No preview for compressed codes");
         $("#cconv").hidden = parsed.format === "sendir";
@@ -492,26 +493,50 @@ class ItachGcPanel extends HTMLElement {
 
   _importDialog() {
     const m = this._openModal(`<h3>Import codes</h3>
-      <p class="hint" style="margin:0 0 14px">Paste an export from this panel, or a simple JSON like <code>{"TV": {"Power": "sendir,…", "Mute": "0000 006D …"}}</code>.</p>
-      <label class="f">Pick a file<input type="file" id="ifile" accept=".json,application/json"></label>
-      <label class="f">…or paste JSON<textarea id="itext" spellcheck="false"></textarea></label>
-      <label class="chk"><input type="checkbox" id="irep"> Replace everything (otherwise merges by name)</label>
+      <p class="hint" style="margin:0 0 14px">Pick a <b>Flipper Zero .ir file</b>, an export from this panel, or paste JSON like <code>{"TV": {"Power": "sendir,…"}}</code>.</p>
+      <label class="f">Pick a file<input type="file" id="ifile" accept=".json,.ir,application/json,text/plain"></label>
+      <label class="f">…or paste it here<textarea id="itext" spellcheck="false" placeholder="JSON, or the contents of a Flipper .ir file"></textarea></label>
+      <div id="iflip" hidden>
+        <label class="f">Device name for these Flipper signals<input id="idev" maxlength="64" placeholder="e.g. Fireplace"></label>
+        <p class="hint">All signals go into this device (an existing one with the same name gets merged). Same-named buttons get a number added.</p>
+      </div>
+      <label class="chk" id="irepw"><input type="checkbox" id="irep"> Replace everything (otherwise merges by name)</label>
       <div class="actions"><span class="spacer"></span><button class="btn" data-a="close">Cancel</button><button class="btn primary" id="igo">Import</button></div>`);
-    m.querySelector("#ifile").onchange = async (e) => {
-      const f = e.target.files?.[0];
-      if (f) m.querySelector("#itext").value = await f.text();
+    const $ = (q) => m.querySelector(q);
+    const isFlipper = (t) => /^\s*Filetype:\s*IR/im.test(t) || /^\s*(protocol|type|data)\s*:/im.test(t);
+    const refresh = () => {
+      const flip = isFlipper($("#itext").value);
+      $("#iflip").hidden = !flip;
+      $("#irepw").hidden = flip;
     };
-    m.querySelector("#igo").onclick = async () => {
-      let data;
-      try { data = JSON.parse(m.querySelector("#itext").value); }
-      catch (e) { this._toast("That isn't valid JSON 😕", true); return; }
-      const replace = m.querySelector("#irep").checked;
-      if (replace && !confirm("Replace ALL devices and codes on this iTach?")) return;
+    $("#itext").addEventListener("input", refresh);
+    $("#ifile").onchange = async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      $("#itext").value = await f.text();
+      if (!$("#idev").value) $("#idev").value = f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+      refresh();
+    };
+    $("#igo").onclick = async () => {
+      const text = $("#itext").value;
       try {
-        const res = await this.ws("import", { entry_id: this._entryId, data, replace });
+        let res;
+        if (isFlipper(text)) {
+          const device = $("#idev").value.trim();
+          if (!device) { this._toast("Give the device a name first 🙏", true); $("#idev").focus(); return; }
+          res = await this.ws("import_flipper", { entry_id: this._entryId, text, device });
+        } else {
+          let data;
+          try { data = JSON.parse(text); }
+          catch (e) { this._toast("That isn't valid JSON or a Flipper .ir file 😕", true); return; }
+          const replace = $("#irep").checked;
+          if (replace && !confirm("Replace ALL devices and codes on this iTach?")) return;
+          res = await this.ws("import", { entry_id: this._entryId, data, replace });
+        }
         this._closeModal();
         await this._reload();
-        this._toast(`Imported ${res.commands} codes across ${res.devices} devices 🎉`);
+        const skipped = res.skipped?.length ? `\nSkipped ${res.skipped.length}:\n${res.skipped.slice(0, 5).join("\n")}` : "";
+        this._toast(`Imported ${res.commands} code${res.commands === 1 ? "" : "s"} 🎉${skipped}`, !!skipped);
       } catch (e) { this._toast(errMsg(e), true); }
     };
   }

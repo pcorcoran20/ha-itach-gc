@@ -13,6 +13,8 @@ from dataclasses import dataclass
 import logging
 import re
 
+from .flipper import flipper_to_gc, looks_like_flipper
+
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PORT = 4998
@@ -80,8 +82,9 @@ class IRCode:
     repeat: int
     offset: int
     pulses: list[str]
-    source: str  # sendir | pronto | raw | compressed
+    source: str  # sendir | pronto | raw | compressed | flipper
     connector: str | None = None
+    detail: str | None = None
 
     @property
     def compressed(self) -> bool:
@@ -149,6 +152,14 @@ def parse_code(code: str) -> IRCode:
             raise ValueError(f"Bad connector '{connector}' (expected e.g. 1:1)")
         body = parts[3:]
         source = "sendir"
+    elif looks_like_flipper(text):
+        freq, repeat, pulses, desc = flipper_to_gc(text)
+        ir = IRCode(
+            freq=freq, repeat=repeat, offset=1, pulses=[str(p) for p in pulses],
+            source="flipper", detail=desc,
+        )
+        _validate(ir)
+        return ir
     elif _PRONTO_RE.match(text):
         ir = _parse_pronto(text)
         _validate(ir)
@@ -159,7 +170,8 @@ def parse_code(code: str) -> IRCode:
     else:
         raise ValueError(
             "Unrecognised format. Paste a Global Caché 'sendir,…' string, "
-            "bare GC data (freq,repeat,offset,on,off,…) or Pronto hex (0000 …)"
+            "bare GC data (freq,repeat,offset,on,off,…), Pronto hex (0000 …) "
+            "or a Flipper Zero signal (protocol/address/command lines)"
         )
 
     body = [p for p in body if p != ""]

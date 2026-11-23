@@ -8,7 +8,8 @@ Control IR devices through a Global Caché **iTach** (IP2IR, WF2IR, Flex IR…),
 - **UI setup**: *Settings → Devices & services → Add integration → Global Caché iTach IR*, then type in the IP.
 - **"iTach IR" sidebar panel** where you can:
   - add devices (TV, soundbar…) and choose which IR port/emitter each one uses
-  - add codes by pasting a **Global Caché `sendir`** string, bare GC data, or **Pronto hex**
+  - add codes by pasting a **Global Caché `sendir`** string, bare GC data, **Pronto hex**, or a **Flipper Zero** signal
+  - **import a whole Flipper Zero `.ir` file** as a device in one go
   - **learn** codes straight from your remote using the iTach's built-in IR learner
   - **test** a code before you save it, and see a live **waveform preview** plus format check
   - convert Pronto to sendir, and import or export everything as JSON
@@ -24,6 +25,18 @@ Control IR devices through a Global Caché **iTach** (IP2IR, WF2IR, Flex IR…),
 4. Open **iTach IR** in the sidebar (admins only).
 
 Tip: give the iTach a fixed IP / DHCP reservation in your router.
+
+## Flipper Zero `.ir` files 🐬
+**Whole file:** go to **⬆ Import**, pick the `.ir` file, give the device a name (e.g. *Fireplace*), then click **Import**. Each signal becomes its own button.
+
+**Single code:** in *Add code*, paste just the lines for one signal (the `name:` line is optional):
+```
+type: parsed
+protocol: NEC
+address: 01 00 00 00
+command: 12 00 00 00
+```
+Supported: NEC, NECext, NEC42, NEC42ext, Samsung32, RC5, RC5X, RC6, SIRC, SIRC15, SIRC20 and `type: raw` signals. Any other protocol (e.g. Kaseikyo) gets skipped and you'll see which ones. For those, re-learn the button on the Flipper as **RAW**, or just use the panel's 📡 Learn.
 
 ## Using it in automations
 ```yaml
