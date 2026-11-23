@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN, PANEL_ELEMENT, PANEL_URL, STATIC_URL, VERSION
+from .const import DOMAIN, PANEL_ELEMENT, PANEL_URL, STATIC_URL
 
 _DATA = f"{DOMAIN}_panel"
+_JS = Path(__file__).parent / "frontend" / "itach-gc-panel.js"
+
+
+def _js_hash() -> str:
+    """Fingerprint of the panel file so browsers reload it whenever it changes."""
+    return hashlib.sha256(_JS.read_bytes()).hexdigest()[:12]
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
@@ -26,13 +33,14 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         state["static"] = True
     if state["panel"]:
         return
+    js_hash = await hass.async_add_executor_job(_js_hash)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=PANEL_URL,
         webcomponent_name=PANEL_ELEMENT,
         sidebar_title="iTach IR",
         sidebar_icon="mdi:remote",
-        module_url=f"{STATIC_URL}/itach-gc-panel.js?v={VERSION}",
+        module_url=f"{STATIC_URL}/itach-gc-panel.js?v={js_hash}",
         require_admin=True,
         config={},
     )

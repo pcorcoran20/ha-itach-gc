@@ -107,3 +107,17 @@ async def test_import_flipper(hass, hass_ws_client, fake_itach):
     await hass.async_block_till_done()
     await hass.services.async_call("button", "press", {"entity_id": "button.fireplace_on_toggle"}, blocking=True)
     assert fake_itach.received[-1].startswith("sendir,1:1,1,38000,1,1,342,171,")
+
+
+async def test_panel_url_is_cache_busted_by_file_hash(hass, fake_itach):
+    import hashlib
+    from pathlib import Path
+
+    entry = MockConfigEntry(domain=DOMAIN, title="iTach", data={CONF_HOST: "127.0.0.1", CONF_PORT: fake_itach.port})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    js = Path(__file__).parent.parent / "custom_components/itach_gc/frontend/itach-gc-panel.js"
+    want = hashlib.sha256(js.read_bytes()).hexdigest()[:12]
+    url = hass.data["frontend_panels"]["itach-gc"].config["_panel_custom"]["module_url"]
+    assert url.endswith(f"?v={want}")
